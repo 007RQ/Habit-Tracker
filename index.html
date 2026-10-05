@@ -2,8 +2,16 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Liquid Glass Habit Tracker</title>
+
+    <!-- PWA & iOS Web App Meta -->
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#0b0f19">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Трекер">
+
     <style>
         * {
             box-sizing: border-box;
@@ -11,6 +19,7 @@
             padding: 0;
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
             -webkit-tap-highlight-color: transparent;
+            touch-action: manipulation;
         }
 
         body {
@@ -307,7 +316,7 @@
             background: rgba(255, 255, 255, 0.08);
             border: 1px solid rgba(255, 255, 255, 0.2);
             color: white;
-            font-size: 15px;
+            font-size: 16px; /* Защита от автозума на iOS */
             outline: none;
         }
 
@@ -389,6 +398,31 @@
     </div>
 
     <script>
+        // Service Worker Registration
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('./sw.js')
+                    .then(reg => console.log('SW зарегистрирован!', reg))
+                    .catch(err => console.error('Ошибка SW:', err));
+            });
+        }
+
+        // Anti-Zoom Gestures Lockdown for iOS
+        document.addEventListener('touchstart', function (event) {
+            if (event.touches.length > 1) {
+                event.preventDefault();
+            }
+        }, { passive: false });
+
+        let lastTouchEnd = 0;
+        document.addEventListener('touchend', function (event) {
+            const now = (new Date()).getTime();
+            if (now - lastTouchEnd <= 300) {
+                event.preventDefault();
+            }
+            lastTouchEnd = now;
+        }, false);
+
         // State Management
         let habits = JSON.parse(localStorage.getItem('liquid_habits')) || [
             { id: 1, title: 'Выпить 2L воды', target: 4, completed: 0, lastUpdated: new Date().toDateString() },
@@ -486,13 +520,11 @@
                 const currentLeft = parseFloat(handle.style.left || 2);
 
                 if (currentLeft > maxOffset * 0.7) {
-                    // Completed step
                     habit.completed += 1;
                     habit.lastUpdated = new Date().toDateString();
                     saveData();
                     renderHabits();
                 } else {
-                    // Reset
                     handle.style.left = '2px';
                     fill.style.width = '52px';
                 }
