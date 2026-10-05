@@ -1,64 +1,41 @@
-const CACHE = "habits-static-v1";
-const ASSETS = [
-  "./",
-  "./index.html",
-  "./manifest.webmanifest",
-  "./icon.svg"
+const CACHE_NAME = 'liquid-habit-tracker-v1';
+const ASSETS_TO_CACHE = [
+  './',
+  './index.html',
+  './manifest.json'
 ];
 
-self.addEventListener("install", event => {
+// Установка Service Worker и кэширование ресурсов
+self.addEventListener('install', (event) => {
   event.waitUntil(
-    caches.open(CACHE)
-      .then(cache => cache.addAll(ASSETS))
-      .then(() => self.skipWaiting())
+    caches.open(CACHE_NAME).then((cache) => {
+      return cache.addAll(ASSETS_TO_CACHE);
+    })
   );
+  self.skipWaiting();
 });
 
-self.addEventListener("activate", event => {
+// Активация и удаление старого кэша
+self.addEventListener('activate', (event) => {
   event.waitUntil(
-    caches.keys()
-      .then(keys =>
-        Promise.all(
-          keys
-            .filter(key => key !== CACHE)
-            .map(key => caches.delete(key))
-        )
-      )
-      .then(() => self.clients.claim())
-  );
-});
-
-self.addEventListener("fetch", event => {
-  const request = event.request;
-
-  if (request.mode === "navigate") {
-    event.respondWith(
-      fetch(request)
-        .then(response => {
-          const copy = response.clone();
-          caches.open(CACHE).then(cache => cache.put("./index.html", copy));
-          return response;
+    caches.keys().then((cacheNames) => {
+      return Promise.all(
+        cacheNames.map((cache) => {
+          if (cache !== CACHE_NAME) {
+            return caches.delete(cache);
+          }
         })
-        .catch(() => caches.match("./index.html"))
-    );
-    return;
-  }
+      );
+    })
+  );
+  self.clients.claim();
+});
 
+// Перехват запросов (работа офлайн)
+self.addEventListener('fetch', (event) => {
   event.respondWith(
-    caches.match(request).then(cached => {
-      const network = fetch(request).then(response => {
-        if (
-          response &&
-          response.ok &&
-          new URL(request.url).origin === self.location.origin
-        ) {
-          const copy = response.clone();
-          caches.open(CACHE).then(cache => cache.put(request, copy));
-        }
-        return response;
-      }).catch(() => cached);
-
-      return cached || network;
+    caches.match(event.request).then((response) => {
+      return response || fetch(event.request);
     })
   );
 });
